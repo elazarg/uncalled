@@ -119,15 +119,17 @@ def find_unused(files):
 def print_unused(defs):
     for item, (filename, *namespace, line) in sorted(defs.items(), key=lambda x:x[1]):
         path = '.'.join(namespace)
-        print('{0}:{1}\t{2}\tat {3}'.format(filename[7:], line, item, path))
+        print('{0}:{1}\t{2}'.format(filename[7:], line, item, path), end=' ')
+        if path:
+            print('\tat', path, end='')
+        print()
 
 
-def main():
-    argv = sys.argv[1:] or glob.glob('*.py')
-    print_unused(find_unused(argv))
+def main(files):
+    print_unused(find_unused(files))
 
 
 if __name__ == '__main__':
-    main()
+    main(sys.argv[1:] or glob.glob('*.py'))
 
-def unused(): pass
+def really_unused(): pass

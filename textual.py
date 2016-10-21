@@ -1,11 +1,15 @@
 from re import findall, IGNORECASE
+import glob
 import sys
+
 
 def find_defs(txt):
     return set([x[5:] for x in findall(' def [a-z][0-9a-z_]+', txt, IGNORECASE)])
 
+
 def find_calls(txt):
     return set(findall('(?<!def )[a-z][0-9a-z_]+', txt, IGNORECASE))
+
 
 def main(files):
     file_defs = {}
@@ -27,5 +31,7 @@ def main(files):
         for d in defs:
             print('\t{}'.format(d))
 
+
 if __name__ == '__main__':
-    main(sys.argv[1:])
+    main(sys.argv[1:] or glob.glob('*.py'))
+
