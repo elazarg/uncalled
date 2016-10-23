@@ -13,6 +13,21 @@ class Flags:
     track_classes = False
     track_variables = False
 
+class Frameworks:    
+    ast = True
+    pytest = True
+
+
+prefixes = ['.__']
+if Frameworks.ast:
+    prefixes += ['.generic_visit', '.visit_']
+if Frameworks.pytest:
+    prefixes += ['.test_', 'test_', '.pytest_', '.runtest', '.run_test', '.set_up', '.setup', 'call', 'teardown', '.cases']
+if Flags.ignore_underscored_methods:
+    prefixes.append('._')
+if Flags.ignore_underscored:
+    prefixes.append('_')
+
 
 class Kind:
     MODULE = 'module'
@@ -26,8 +41,8 @@ Namespace = namedtuple('Namespace', ['kind', 'name', 'lineno'])
     
 class Collector(ast.NodeVisitor):
     def __init__(self):
-        self.definitions = [] # list(xpath)
-        self.references =  [] # list(xpath)
+        self.definitions = []  # list(xpath)
+        self.references = []  # list(xpath)
 
     def visit_AsyncFunctionDef(self, fd: 'ast.AsyncFunctionDef'):
         return self.visit_FunctionDef(fd)
@@ -58,8 +73,8 @@ class Collector(ast.NodeVisitor):
                 self.definitions.append(self.xpath[:-1] + (namespace,))
                 self.visit(node.value)
         else:
-            self.references.append(self.xpath + (Namespace(Kind.NAME, name, node.lineno), ))
-            self.references.append(self.xpath + (Namespace(Kind.NAME, '.' + name, node.lineno), ))
+            self.references.append(self.xpath + (Namespace(Kind.NAME, name, node.lineno),))
+            self.references.append(self.xpath + (Namespace(Kind.NAME, '.' + name, node.lineno),))
             self.visit(node.value)
 
     def visit_Name(self, name: ast.Name):
@@ -70,7 +85,7 @@ class Collector(ast.NodeVisitor):
         else:
             if self.xpath[-1].kind is Kind.CLASS:
                 id = '.' + id
-            self.references.append(self.xpath + (Namespace(Kind.NAME, id, name.lineno), ))
+            self.references.append(self.xpath + (Namespace(Kind.NAME, id, name.lineno),))
 
     # ImportFrom(identifier? module, alias* names, int? level)
     def visit_ImportFrom(self, imp: ast.ImportFrom):
@@ -112,7 +127,7 @@ def username_xpath(xpath):
         if k2 is Kind.CLASS:
             return 'inner class', pair
         if k2 is Kind.FUNC:
-            return 'function', pair
+            return 'method', pair
         if k2 is Kind.NAME:
             return 'attribute', pair
         else:
@@ -125,13 +140,6 @@ def username_xpath(xpath):
         return 'class', x2.name
     assert False, str(x2) 
 
-
-prefixes = ['.__', '.test_', 'test_',
-            '.generic_visit', '.visit_']
-if Flags.ignore_underscored_methods:
-    prefixes.append('._')
-if Flags.ignore_underscored:
-    prefixes.append('_')
 
 def is_reachable(xpath, references):
     return all(name in references 
