@@ -34,4 +34,3 @@ def main(files):
 
 if __name__ == '__main__':
     main(sys.argv[1:] or glob.glob('*.py'))
-
