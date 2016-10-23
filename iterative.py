@@ -1,94 +1,148 @@
 #!/usr/bin/python3
 from contextlib import contextmanager
-from ast import NodeVisitor
+from collections import namedtuple
+from enum import Enum
 import ast
-import sys
-import glob
 
+
+# TODO: import as alias, not use
 
 class Flags:
     include_strings = True
+    ignore_underscored_methods = False
+    ignore_underscored = True
+    track_classes = False
+    track_variables = False
 
 
-def is_external_or_in(s):
-    def is_external(name):
-        prefixes = ['.__', '.test_', '.visit_']
-        if any(name.startswith(p) for p in prefixes):
-            return True
-        return False
-    return lambda x: x in s or is_external(x)
+class Kind(str, Enum):
+    MODULE = 'module'
+    CLASS = 'class'
+    FUNC = 'function'
+    NAME = 'variable'
 
 
-class Collector(NodeVisitor):
-    @classmethod
-    def collect(cls, modules_filenames, referenced=set()):
-        collector = cls()
-        collector.referenced = is_external_or_in(referenced)
-        for module, filename in modules_filenames:
-            collector.namespace = ('module ' + filename,)
-            collector.visit(module)
-        return collector.return_items()
+Namespace = namedtuple('Namespace', ['kind', 'name', 'lineno'])
 
-    @contextmanager
-    def enter_namespace(self, kind, name):
-        self.namespace += ('{} {}'.format(kind, name),)
-        yield
-        self.namespace = self.namespace[:-1]
-
-    def not_in_class(self):
-        return not self.namespace[-1].startswith('class ')
-
-    def visit_ClassDef(self, cd: ast.ClassDef):
-        with self.enter_namespace('class', cd.name):
-            self.generic_visit(cd)
-
-    def visit_FunctionDef(self, fd: ast.FunctionDef):
-        with self.enter_namespace('def', fd.name):
-            self.generic_visit(fd)
+    
+class Collector(ast.NodeVisitor):
+    def __init__(self):
+        self.references =  [] # list(xpath)
+        self.definitions = [] # list(xpath)
 
     def visit_AsyncFunctionDef(self, fd: 'ast.AsyncFunctionDef'):
         return self.visit_FunctionDef(fd)
 
-    def is_referenced(self, name):
-        return self.referenced('.' + name) \
-            or self.not_in_class() and self.referenced(name)
-
-
-class Defs(Collector):
-    def __init__(self):
-        self.defs = {}  # name -> namespace
-
     def visit_FunctionDef(self, fd: ast.FunctionDef):
-        if not self.is_referenced(fd.name):
-            self.defs[fd.name] = self.namespace + (str(fd.lineno),)
-        super().visit_FunctionDef(fd)
+        with self.enter_definition(Kind.FUNC, fd.name, fd.lineno):
+            self.generic_visit(fd)
 
-    def return_items(self):
-        return self.defs
+    def visit_ClassDef(self, cd: ast.ClassDef):
+        with self.enter_definition(Kind.CLASS, cd.name, cd.lineno):
+            self.generic_visit(cd)
 
-
-class Refs(Collector):
-    def __init__(self):
-        self.refs = set()
-
-    def visit_FunctionDef(self, fd: ast.FunctionDef):
-        if self.is_referenced(fd.name) or fd.name in self.refs:
-            super().visit_FunctionDef(fd)
+    @contextmanager
+    def enter_definition(self, kind, name, lineno):
+        if self.xpath[-1].kind is Kind.CLASS:
+            name = '.' + name
+        self.xpath += (Namespace(kind, name, lineno),)
+        self.definitions.append(self.xpath)
+        yield
+        self.xpath = self.xpath[:-1]
 
     def visit_Attribute(self, attr: ast.Attribute):
-        self.refs.add('.' + attr.attr)
+        node = attr
+        name = node.attr
+        if isinstance(node.ctx, ast.Store):
+            if isinstance(attr.value, ast.Name) and attr.value.id == 'self':
+                namespace = Namespace(Kind.NAME, '.' + name, node.lineno)
+                self.definitions.append(self.xpath[:-1] + (namespace,))
+                self.generic_visit(node)
+        else:
+            self.references.append(self.xpath + (Namespace(Kind.NAME, name, node.lineno), ))
+            self.references.append(self.xpath + (Namespace(Kind.NAME, '.' + name, node.lineno), ))
+            self.generic_visit(node)
 
     def visit_Name(self, name: ast.Name):
-        if isinstance(name.ctx, ast.Load):
-            self.refs.add(name.id)
+        node = name
+        name = node.id
+        if isinstance(node.ctx, ast.Store):
+            with self.enter_definition(Kind.NAME, name, node.lineno):
+                self.generic_visit(node)
+        else:
+            if self.xpath[-1].kind is Kind.CLASS:
+                name = '.' + name
+            self.references.append(self.xpath + (Namespace(Kind.NAME, name, node.lineno), ))
+            self.generic_visit(node)
 
-    def visit_Str(self, st: ast.Str):
-        if Flags.include_strings:
-            self.refs.add(st.s)
-            self.refs.add('.' + st.s)
+    @staticmethod
+    def collect(modules_filenames):
+        self = Collector()
+        for module, filename in modules_filenames:
+            self.xpath = (Namespace(Kind.MODULE, filename, 0),)
+            self.visit(module)
+        return self.references, self.definitions
 
-    def return_items(self):
-        return self.refs
+
+def find_unused(files):
+    modules_filenames = tuple(parse_modules(files))
+    all_references, all_definitions_paths = Collector.collect(modules_filenames)
+    references = set()
+    while True:
+        new_references = {xpath[-1].name for xpath in all_references
+                          if is_reachable(xpath[:-1], references)}
+        if new_references <= references:
+            break
+        references.update(new_references)
+    return {xpath for xpath in all_definitions_paths
+            if not is_reachable(xpath, references)}
+
+
+def username_xpath(xpath):
+    x1, x2 = xpath[-2], xpath[-1]
+    k1, k2 = x1.kind, x2.kind
+    if k1 is Kind.CLASS:
+        pair = x1.name + x2.name
+        if k2 is Kind.CLASS:
+            return 'inner class', pair
+        if k2 is Kind.FUNC:
+            return 'method', pair
+        if k2 is Kind.NAME:
+            return 'attribute', pair
+        else:
+            assert False, str(k2)
+    if k2 == Kind.NAME:
+        return 'variable', x2.name
+    if k2 == Kind.FUNC:
+        return 'function', x2.name
+    if k2 == Kind.CLASS:
+        return 'class', x2.name
+    assert False, str(x2) 
+
+
+def is_external(name):
+    prefixes = ['.__', '.test_', '.visit_']
+    if Flags.ignore_underscored_methods:
+        prefixes.append('._')
+    if Flags.ignore_underscored:
+        prefixes.append('_')
+    if any(name.startswith(p) for p in prefixes):
+        return True
+    return False
+
+
+def is_reachable(xpath, references):
+    return all(is_external(n.name) 
+               or n.name in references 
+               or n.kind in [Kind.CLASS, Kind.MODULE]
+               for n in xpath)
+
+
+def print_unused(names):
+    for xpath in sorted(names):
+        kind, fullname = username_xpath(xpath)
+        print("{module.name}:{xpath.lineno}: Unused {kind} '{fullname}'".format(
+            module=xpath[0], xpath=xpath[-1], kind=kind, fullname=fullname))
 
 
 def parse_modules(filenames):
@@ -104,32 +158,11 @@ def parse_modules(filenames):
             yield module, filename
 
 
-def find_unused(files):
-    modules_filenames = tuple(parse_modules(files))
-    referenced = set()
-    while True:
-        now_referenced = Refs.collect(modules_filenames,
-                                      referenced=referenced)
-        if now_referenced <= referenced:
-            break
-        referenced.update(now_referenced)
-    return Defs.collect(modules_filenames, referenced)
-
-
-def print_unused(defs):
-    for item, (filename, *namespace, line) in sorted(defs.items(), key=lambda x:x[1]):
-        path = '.'.join(namespace)
-        print('{0}:{1}\t{2}'.format(filename[7:], line, item, path), end=' ')
-        if path:
-            print('\tat', path, end='')
-        print()
-
-
 def main(files):
     print_unused(find_unused(files))
 
 
 if __name__ == '__main__':
+    import sys
+    import glob
     main(sys.argv[1:] or glob.glob('*.py'))
-
-def really_unused(): pass
