@@ -74,8 +74,10 @@ class Collector(ast.NodeVisitor):
 
     # ImportFrom(identifier? module, alias* names, int? level)
     def visit_ImportFrom(self, imp: ast.ImportFrom):
-        # TODO: handle imports
-        pass
+        # TODO: handle aliases
+        for alias in imp.names:
+            self.references.append((Namespace(Kind.MODULE, imp.module + '.py', imp.lineno),
+                                    Namespace(Kind.NAME, alias.name, imp.lineno)))
 
 
 def collect(modules_filenames):
@@ -124,7 +126,8 @@ def username_xpath(xpath):
     assert False, str(x2) 
 
 
-prefixes = ['.__', '.test_', '.visit_']
+prefixes = ['.__', '.test_', 'test_',
+            '.generic_visit', '.visit_']
 if Flags.ignore_underscored_methods:
     prefixes.append('._')
 if Flags.ignore_underscored:
