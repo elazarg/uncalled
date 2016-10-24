@@ -1,36 +1,36 @@
-from re import findall, IGNORECASE
-import glob
-import sys
+from re import findall, IGNORECASE, MULTILINE
 
+from whitelist import is_framework
 
 def find_defs(txt):
-    return set([x[5:] for x in findall(' def [a-z][0-9a-z_]+', txt, IGNORECASE)])
+    return set([x.strip()[4:] for x in findall('^\s+def [^\d\W]\w*', txt,
+                                               IGNORECASE | MULTILINE)])
+
+def find_uses(txt):
+    return set(findall('(?<!def )[^\d\W]\w*', txt, IGNORECASE))
 
 
-def find_calls(txt):
-    return set(findall('(?<!def )[a-z][0-9a-z_]+', txt, IGNORECASE))
+def read_file(filename):
+    with open(filename) as f:
+        return f.read()
 
-
-def main(files):
-    file_defs = {}
-    calls = set()
-    for file in files:
-        file_defs[file] = set()
-        with open(file) as f:
-            text = f.read()
-            file_defs[file].update(find_defs(text))
-            calls.update(find_calls(text))
-    for file in file_defs:
-        file_defs[file] = {x for x in file_defs[file] - calls 
-                           if 'visit' not in x and not x.startswith('test_')}
         
-    for file, defs in file_defs.items():
-        if not defs:
-            continue
-        print(file, ':')
-        for d in defs:
-            print('\t{}'.format(d))
+def main(files):
+    files = list(sorted(files))
+    file_text = {f: read_file(f) for f in files}
+    file_defs = {f: find_defs(txt) for f, txt in file_text.items()}
+    file_uses = {f: find_uses(txt) for f, txt in file_text.items()}
+    uses = {call for calls in file_uses.values()
+             for call in calls}
+    file_unused_defs = [(file, name)
+                        for file in files
+                        for name in file_defs[file] - uses
+                            if not is_framework(name)]
+    for file, name in file_unused_defs:
+        print('{}: Unused function {}'.format(file, name))
 
 
 if __name__ == '__main__':
+    import glob
+    import sys
     main(sys.argv[1:] or glob.glob('*.py'))
