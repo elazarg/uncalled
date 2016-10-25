@@ -3,31 +3,9 @@ from contextlib import contextmanager
 from collections import namedtuple
 import ast
 
+from whitelist import is_framework
 
 # TODO: import as alias, not use
-
-class Flags:
-    include_strings = True
-    ignore_underscored_methods = True
-    ignore_underscored = True
-    track_classes = False
-    track_variables = False
-
-class Frameworks:    
-    ast = True
-    pytest = True
-
-
-prefixes = ['.__']
-if Frameworks.ast:
-    prefixes += ['.generic_visit', '.visit_']
-if Frameworks.pytest:
-    prefixes += ['.test_', 'test_', '.pytest_', '.runtest', '.run_test', '.set_up', '.setup', 'call', 'teardown', '.cases']
-if Flags.ignore_underscored_methods:
-    prefixes.append('._')
-if Flags.ignore_underscored:
-    prefixes.append('_')
-
 
 class Kind:
     MODULE = 'module'
@@ -95,17 +73,15 @@ class Collector(ast.NodeVisitor):
                                     Namespace(Kind.NAME, alias.name, imp.lineno)))
 
 
-def collect(modules_filenames):
+def collect(files):
     c = Collector()
-    for module, filename in modules_filenames:
+    for module, filename in parse_modules(files):
         c.xpath = (Namespace(Kind.MODULE, filename, 0),)
         c.visit(module)
     return c.references, c.definitions
 
 
-def find_unused(files):
-    modules_filenames = tuple(parse_modules(files))
-    all_references, all_definitions_paths = collect(modules_filenames)
+def find_unused(all_references, all_definitions_paths):
     references = set()
     while True:
         new_references = {xpath[-1].name for xpath in all_references
@@ -118,6 +94,34 @@ def find_unused(files):
     return {xpath for xpath in all_definitions_paths
             if not is_reachable(xpath, references)}
 
+
+def collect1(files):
+    from re import findall
+    references = []
+    definitions = []
+    for filename in files:
+        print(filename)
+        definitions.append( (Namespace(Kind.MODULE, filename, 0),) )
+        index = 0
+        with open(filename) as f:
+            for lineno, line in enumerate(f, 1):
+                if not line.strip():
+                    continue
+                while not line.startswith('    ' * index):
+                    index -= 1
+                items = line.split(maxsplit=1)
+                if len(items) > 1  and items[0] in ['class', 'def']:
+                    kind = Kind.CLASS if items[0] == 'class' else Kind.FUNC 
+                    name_line = items[1].replace(':', '(').split('(', maxsplit=1)
+                    if len(name_line) > 1:
+                        name, line = name_line
+                        definitions.append(definitions[index] + (Namespace(kind, name, lineno),) )
+                        index = len(definitions[-1]) - 1
+                references.extend(definitions[index] + (Namespace(Kind.FUNC, name, lineno),)
+                                  for name in set(findall('[^\d\W]\w*', line)))
+    for d in definitions:
+        print(d)
+    return references, definitions
 
 def username_xpath(xpath):
     x1, x2 = xpath[-2], xpath[-1]
@@ -144,15 +148,8 @@ def username_xpath(xpath):
 def is_reachable(xpath, references):
     return all(name in references 
                or kind in [Kind.CLASS, Kind.MODULE]
-               or any(name.startswith(p) for p in prefixes)
+               or is_framework(name)
                for (kind, name, lineno) in xpath)
-
-
-def print_unused(names):
-    for xpath in sorted(names):
-        kind, fullname = username_xpath(xpath)
-        print("{module.name}:{xpath.lineno}: Unused {kind} '{fullname}'".format(
-            module=xpath[0], xpath=xpath[-1], kind=kind, fullname=fullname))
 
 
 def parse_modules(filenames):
@@ -168,8 +165,17 @@ def parse_modules(filenames):
             yield module, filename
 
 
+def print_unused(names):
+    return
+    for xpath in sorted(names):
+        kind, fullname = username_xpath(xpath)
+        print("{module.name}:{xpath.lineno}: Unused {kind} '{fullname}'".format(
+            module=xpath[0], xpath=xpath[-1], kind=kind, fullname=fullname))
+
+
 def main(files):
-    print_unused(find_unused(files))
+    all_references, all_definitions_paths = collect1(files)
+    print_unused(find_unused(all_references, all_definitions_paths))
 
 
 if __name__ == '__main__':
