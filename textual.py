@@ -3,8 +3,7 @@ from re import findall, IGNORECASE, MULTILINE
 from whitelist import is_framework
 
 def find_defs(txt):
-    return set([x.strip()[4:] for x in findall('^\s+def [^\d\W]\w*', txt,
-                                               IGNORECASE | MULTILINE)])
+    return set([x.strip()[4:] for x in findall('^\s+def [^\d\W]\w*', txt, MULTILINE)])
 
 def find_uses(txt):
     return set(findall('(?<!def )[^\d\W]\w*', txt, IGNORECASE))
@@ -16,6 +15,8 @@ def read_file(filename):
 
         
 def main(files):
+    import whitelist
+    whitelist.method_prefix = '.'
     files = list(sorted(files))
     file_text = {f: read_file(f) for f in files}
     file_defs = {f: find_defs(txt) for f, txt in file_text.items()}

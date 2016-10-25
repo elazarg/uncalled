@@ -73,9 +73,9 @@ class Collector(ast.NodeVisitor):
                                     Namespace(Kind.NAME, alias.name, imp.lineno)))
 
 
-def collect(files):
+def collect(filenames):
     c = Collector()
-    for module, filename in parse_modules(files):
+    for module, filename in parse_modules(filenames):
         c.xpath = (Namespace(Kind.MODULE, filename, 0),)
         c.visit(module)
     return c.references, c.definitions
@@ -94,34 +94,6 @@ def find_unused(all_references, all_definitions_paths):
     return {xpath for xpath in all_definitions_paths
             if not is_reachable(xpath, references)}
 
-
-def collect1(files):
-    from re import findall
-    references = []
-    definitions = []
-    for filename in files:
-        print(filename)
-        definitions.append( (Namespace(Kind.MODULE, filename, 0),) )
-        index = 0
-        with open(filename) as f:
-            for lineno, line in enumerate(f, 1):
-                if not line.strip():
-                    continue
-                while not line.startswith('    ' * index):
-                    index -= 1
-                items = line.split(maxsplit=1)
-                if len(items) > 1  and items[0] in ['class', 'def']:
-                    kind = Kind.CLASS if items[0] == 'class' else Kind.FUNC 
-                    name_line = items[1].replace(':', '(').split('(', maxsplit=1)
-                    if len(name_line) > 1:
-                        name, line = name_line
-                        definitions.append(definitions[index] + (Namespace(kind, name, lineno),) )
-                        index = len(definitions[-1]) - 1
-                references.extend(definitions[index] + (Namespace(Kind.FUNC, name, lineno),)
-                                  for name in set(findall('[^\d\W]\w*', line)))
-    for d in definitions:
-        print(d)
-    return references, definitions
 
 def username_xpath(xpath):
     x1, x2 = xpath[-2], xpath[-1]
@@ -166,7 +138,6 @@ def parse_modules(filenames):
 
 
 def print_unused(names):
-    return
     for xpath in sorted(names):
         kind, fullname = username_xpath(xpath)
         print("{module.name}:{xpath.lineno}: Unused {kind} '{fullname}'".format(
@@ -174,7 +145,9 @@ def print_unused(names):
 
 
 def main(files):
-    all_references, all_definitions_paths = collect1(files)
+    import whitelist
+    whitelist.method_prefix = '.'
+    all_references, all_definitions_paths = collect(files)
     print_unused(find_unused(all_references, all_definitions_paths))
 
 
