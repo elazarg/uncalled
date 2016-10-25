@@ -1,6 +1,8 @@
 from re import findall, IGNORECASE, MULTILINE
 
-from whitelist import is_framework
+from whitelist import get_matcher
+is_framework = get_matcher('')
+
 
 def find_defs(txt):
     return set([x.strip()[4:] for x in findall('^\s+def [^\d\W]\w*', txt, MULTILINE)])
@@ -15,8 +17,6 @@ def read_file(filename):
 
         
 def main(files):
-    import whitelist
-    whitelist.method_prefix = '.'
     files = list(sorted(files))
     file_text = {f: read_file(f) for f in files}
     file_defs = {f: find_defs(txt) for f, txt in file_text.items()}

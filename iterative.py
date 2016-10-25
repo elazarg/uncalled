@@ -3,7 +3,8 @@ from contextlib import contextmanager
 from collections import namedtuple
 import ast
 
-from whitelist import is_framework
+import whitelist
+is_framework = whitelist.get_matcher()
 
 # TODO: import as alias, not use
 
@@ -43,17 +44,18 @@ class Collector(ast.NodeVisitor):
         self.xpath = self.xpath[:-1]
 
     def visit_Attribute(self, attr: ast.Attribute):
-        node = attr
-        name = node.attr
-        if isinstance(node.ctx, ast.Store):
-            if isinstance(attr.value, ast.Name) and attr.value.id == 'self':
-                namespace = Namespace(Kind.NAME, '.' + name, node.lineno)
+        name = attr.attr
+        value = attr.value
+        lineno = attr.lineno
+        if isinstance(attr.ctx, ast.Store):
+            if isinstance(value, ast.Name) and value.id == 'self':
+                namespace = Namespace(Kind.NAME, '.' + name, lineno)
                 self.definitions.append(self.xpath[:-1] + (namespace,))
-                self.visit(node.value)
+                self.visit(value)
         else:
-            self.references.append(self.xpath + (Namespace(Kind.NAME, name, node.lineno),))
-            self.references.append(self.xpath + (Namespace(Kind.NAME, '.' + name, node.lineno),))
-            self.visit(node.value)
+            self.references.append(self.xpath + (Namespace(Kind.NAME, name, lineno),))
+            self.references.append(self.xpath + (Namespace(Kind.NAME, '.' + name, lineno),))
+            self.visit(value)
 
     def visit_Name(self, name: ast.Name):
         id = name.id
@@ -89,10 +91,20 @@ def find_unused(all_references, all_definitions_paths):
         if new_references <= references:
             break
         references.update(new_references)
-        all_references = [x for x in all_references
-                          if x[-1].name not in references]
+        all_references = [xpath for xpath in all_references
+                          if xpath[-1].name not in references]
     return {xpath for xpath in all_definitions_paths
             if not is_reachable(xpath, references)}
+
+
+def is_reachable(xpath, references):
+    for (kind, name, _) in xpath:
+        if (kind is not Kind.CLASS
+            and kind is not Kind.MODULE
+            and name not in references
+            and not is_framework(name)):
+            return False
+    return True
 
 
 def username_xpath(xpath):
@@ -117,13 +129,6 @@ def username_xpath(xpath):
     assert False, str(x2) 
 
 
-def is_reachable(xpath, references):
-    return all(name in references 
-               or kind in [Kind.CLASS, Kind.MODULE]
-               or is_framework(name)
-               for (kind, name, lineno) in xpath)
-
-
 def parse_modules(filenames):
     for filename in filenames:
         with open(filename) as f:
@@ -139,14 +144,16 @@ def parse_modules(filenames):
 
 def print_unused(names):
     for xpath in sorted(names):
+        if xpath[-1].kind is Kind.CLASS and not whitelist.Flags.track_classes:
+            continue
+        if xpath[-1].kind is Kind.NAME and not whitelist.Flags.track_variables:
+            continue
         kind, fullname = username_xpath(xpath)
         print("{module.name}:{xpath.lineno}: Unused {kind} '{fullname}'".format(
             module=xpath[0], xpath=xpath[-1], kind=kind, fullname=fullname))
 
 
 def main(files):
-    import whitelist
-    whitelist.method_prefix = '.'
     all_references, all_definitions_paths = collect(files)
     print_unused(find_unused(all_references, all_definitions_paths))
 
