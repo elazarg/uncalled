@@ -8,6 +8,7 @@ is_framework = whitelist.get_matcher()
 
 # TODO: import as alias, not use
 
+
 class Kind:
     MODULE = 'module'
     CLASS = 'class'
@@ -101,8 +102,8 @@ def is_reachable(xpath, references):
     for (kind, name, _) in xpath:
         if (kind is not Kind.CLASS
             and kind is not Kind.MODULE
-            and name not in references
-            and not is_framework(name)):
+                and name not in references
+                and not is_framework(name)):
             return False
     return True
 

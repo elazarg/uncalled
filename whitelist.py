@@ -14,7 +14,7 @@ class Frameworks:
     pytest = True
 
 
-def get_matcher(method_prefix = r'\.'):
+def get_matcher(method_prefix=r'\.'):
     def methods(*items):
         return [method_prefix + x for x in items]
 
@@ -30,4 +30,3 @@ def get_matcher(method_prefix = r'\.'):
         prefixes.append('_.+')
     
     return re.compile('|'.join('({})'.format(p) for p in prefixes)).fullmatch
-    
