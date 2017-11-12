@@ -1,5 +1,5 @@
 # uncalled
-Finding unused functions in Python projects
+Find unused functions in Python projects
 
 tl;dr
 
