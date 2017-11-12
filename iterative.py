@@ -154,12 +154,6 @@ def print_unused(names):
             module=xpath[0], xpath=xpath[-1], kind=kind, fullname=fullname))
 
 
-def main(files):
+def run(files):
     all_references, all_definitions_paths = collect(files)
     print_unused(find_unused(all_references, all_definitions_paths))
-
-
-if __name__ == '__main__':
-    import sys
-    import glob
-    main(sys.argv[1:] or glob.glob('*.py'))
