@@ -1,9 +1,11 @@
 ``uncalled``
 ============
 
-Find unused functions in Python projects, using either regular expressions (the default) or AST traversal.
+Find unused functions in Python projects.
 
-The regular expressions are fast and has surprisingly few false-positives.
+
+This tool uses either regular expressions (the default) or AST traversal.
+The regular expressions are *fast* and has surprisingly few false-positives.
 To further reduce false positives, there is a combined mode ``both``.
 
 
