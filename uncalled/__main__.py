@@ -1,14 +1,14 @@
 import argparse
-import single_pass
-import ast_finder
-import regex_finder
+from . import single_pass
+from . import ast_finder
+from . import regex_finder
 
 
 def main():
     parser = argparse.ArgumentParser(description='Find uncalled function in Python projects')
     parser.add_argument('--how', choices=['ast', 'regex', 'both'], default='regex',
                         help='technique to use. use "both" to reduce false positives [default: regex]')
-    parser.add_argument('files', nargs='*', default='.', help='files to analyze')
+    parser.add_argument('files', nargs='+', default='.', help='files to analyze')
     args = parser.parse_args()
 
     results_ast = set()

@@ -3,10 +3,10 @@ uncalled
 
 Find unused functions in Python projects
 
-tl;dr
+::
 
-    $ python3 uncalled path/to/project/*.py
-or
+    $ uncalled --how regex path/to/project
 
-    $ python3 uncalled [--how {regex,ast,both}] path/to/project/*.py
-    
+    $ uncalled --how ast path/to/project
+
+    $ uncalled --how both path/to/project

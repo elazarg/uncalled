@@ -100,7 +100,7 @@ setup(
     # pip to create the appropriate form of executable for the target platform.
     entry_points={
         'console_scripts': [
-            'uncalled=__main__:main',
+            'uncalled=uncalled.__main__:main',
         ],
     },
 )

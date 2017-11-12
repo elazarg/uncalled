@@ -3,7 +3,7 @@ from contextlib import contextmanager
 from collections import namedtuple
 import ast
 
-import whitelist
+from . import whitelist
 is_framework = whitelist.get_matcher()
 
 # TODO: import as alias, not use

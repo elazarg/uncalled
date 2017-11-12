@@ -1,5 +1,5 @@
 import os
-from whitelist import get_matcher
+from .whitelist import get_matcher
 
 is_framework = get_matcher('')
 
@@ -7,12 +7,14 @@ is_framework = get_matcher('')
 def read_file(filenames):
     for filename in filenames:
         basename = os.path.basename(filename)
-        if basename.startswith('.') or basename.startswith('__'):
+        if basename.startswith('.'):
             continue
         if os.path.isfile(filename) and os.path.splitext(filename)[-1] == '.py':
             with open(filename) as f:
                 yield (filename, f.read())
         elif os.path.isdir(filename):
+            if basename.startswith('__'):
+                continue
             yield from read_file([filename + '/' + f for f in os.listdir(filename)])
 
         
