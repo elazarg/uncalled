@@ -1,4 +1,6 @@
-# uncalled
+uncalled
+--------
+
 Find unused functions in Python projects
 
 tl;dr
