@@ -9,9 +9,10 @@ class Flags:
     track_variables = True
 
 
-class Frameworks:    
+class Frameworks:
     ast = True
     pytest = True
+    unittest = True
 
 
 def get_matcher(method_prefix=r'\.'):
@@ -21,12 +22,14 @@ def get_matcher(method_prefix=r'\.'):
     prefixes = methods('__.+')
     if Frameworks.ast:
         prefixes += methods('generic_visit', 'visit_.+')
+    if Frameworks.unittest:
+        prefixes += ['tearDown', 'setUp']
     if Frameworks.pytest:
-        prefixes += ['test_.+', 'call', 'pytest_.*', ] 
+        prefixes += ['test_.+', 'call', 'pytest_.*']
         prefixes += methods('test_.+', 'runtest', 'run_test', 'set_up', 'setup', 'teardown', 'cases')
     if Flags.ignore_underscored_methods:
         prefixes += methods('_.+')
     if Flags.ignore_underscored:
         prefixes.append('_.+')
-    
+
     return re.compile('|'.join('({})'.format(p) for p in prefixes)).fullmatch
