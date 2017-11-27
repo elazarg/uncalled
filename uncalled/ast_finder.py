@@ -18,7 +18,10 @@ class AstFinder:
     def find_uses(self):
         return set(self.collector.references)
 
-    
+    def find_prefixes(self):
+        return set()
+
+
 class StoreLoadCollector(ast.NodeVisitor):
     def __init__(self):
         self.definitions = []  # list[str]
