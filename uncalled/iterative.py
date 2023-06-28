@@ -1,4 +1,3 @@
-#!/usr/bin/python3
 from contextlib import contextmanager
 from collections import namedtuple
 import ast
@@ -132,7 +131,7 @@ def username_xpath(xpath):
 
 def parse_modules(filenames):
     for filename in filenames:
-        with open(filename) as f:
+        with open(filename, encoding='utf-8') as f:
             source = f.read()
         try:
             module = ast.parse(source, filename=filename)

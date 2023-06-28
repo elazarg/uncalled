@@ -13,6 +13,7 @@ class Frameworks:
     ast = True
     pytest = True
     unittest = True
+    flask = True
 
 
 def get_matcher(method_prefix=r'\.'):
@@ -27,6 +28,9 @@ def get_matcher(method_prefix=r'\.'):
     if Frameworks.pytest:
         prefixes += ['test_.+', 'call', 'pytest_.*']
         prefixes += methods('test_.+', 'runtest', 'run_test', 'set_up', 'setup', 'teardown', 'cases')
+    if Frameworks.flask:
+        prefixes += ['before_request', 'after_request', 'put', 'get', 'post', 'delete', 'patch',
+                     'head', 'options', 'trace', 'route', 'errorhandler']
     if Flags.ignore_underscored_methods:
         prefixes += methods('_.+')
     if Flags.ignore_underscored:

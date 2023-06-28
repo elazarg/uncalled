@@ -1,4 +1,5 @@
 import ast
+import sys
 
 
 class AstFinder:
@@ -9,7 +10,7 @@ class AstFinder:
             self.collector.generic_visit(parsed)
         except SyntaxError:
             # raise SyntaxError('Cannot parse ' + filename) from None
-            print('Note: cannot parse ast of ', filename)
+            print('Note: cannot parse ast of ', filename, file=sys.stderr)
             pass
 
     def find_defs(self):

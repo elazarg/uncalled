@@ -10,7 +10,7 @@ def read_file(filenames):
         if basename.startswith('.'):
             continue
         if os.path.isfile(filename) and os.path.splitext(filename)[-1] == '.py':
-            with open(filename) as f:
+            with open(filename, encoding='utf-8') as f:
                 yield (filename, f.read())
         elif os.path.isdir(filename):
             if basename.startswith('__'):
