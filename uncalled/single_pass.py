@@ -1,24 +1,36 @@
 import os
+from pathlib import Path
+from typing import Iterable, Iterator
+
 from .whitelist import get_matcher
 
 is_framework = get_matcher('')
 
 
-def read_file(filenames):
-    for filename in filenames:
-        basename = os.path.basename(filename)
+def is_venv(filename: Path) -> bool:
+    basename = os.path.basename(filename)
+    return basename in ['venv', '.venv', 'virtualenv', '.virtualenv']
+
+
+def read_file(paths: Iterable[Path]) -> Iterator[tuple[Path, str]]:
+    for path in paths:
+        basename = path.name
         if basename.startswith('.'):
             continue
-        if os.path.isfile(filename) and os.path.splitext(filename)[-1] == '.py':
-            with open(filename, encoding='utf-8') as f:
-                yield (filename, f.read())
-        elif os.path.isdir(filename):
+        if path.is_file() and path.suffix == '.py':
+            with open(path, encoding='utf-8') as f:
+                yield (path, f.read())
+        elif path.is_dir():
             if basename.startswith('__'):
                 continue
-            yield from read_file([filename + '/' + f for f in os.listdir(filename)])
+            if is_venv(path):
+                continue
+            yield from read_file([path / f for f in os.listdir(path)])
 
 
 def run(filenames, make_finder):
+    # normalize filenames
+    filenames = [Path(f) for f in filenames]
     file_text = dict(read_file(filenames))
     files = list(file_text.keys())
     finders = {f: make_finder(f, txt) for f, txt in file_text.items()}
