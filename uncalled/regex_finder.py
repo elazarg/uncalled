@@ -2,6 +2,9 @@ import re
 
 
 def prepare(txt: str) -> str:
+    # this is a hack to remove comments. It may remove too much, but rarely
+    txt = re.sub(r'#[^\r\n]*', '', txt)
+
     return re.sub(r'"""[^\r]*?"""' + r"|'''[^\r]*?'''", '...', txt)
 
 

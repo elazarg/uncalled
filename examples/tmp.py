@@ -12,7 +12,8 @@ def func3():
     def func4():
         pass
 
-    func5()
+    func3()
     :return:
     """
+    # func3()
     pass
