@@ -20,7 +20,7 @@ classifiers = [
 
 [project.urls]
 "Homepage" = "https://github.com/elazarg/uncalled"
-"Bug Tracker" = "ttps://github.com/elazarg/uncalled/issues"
+"Bug Tracker" = "https://github.com/elazarg/uncalled/issues"
 
 [project.scripts]
 uncalled = 'uncalled.__main__:main'
